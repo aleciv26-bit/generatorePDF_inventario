@@ -128,8 +128,8 @@ def genera_singolo_pdf_bytes(
         "CellH",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=7.5,
-        leading=9.5,
+        fontSize=7,
+        leading=9,
         textColor=colors.white,
         splitByChar=0,
     )
@@ -239,15 +239,15 @@ def genera_singolo_pdf_bytes(
     )
     elements.append(Spacer(1, 10))
 
-    # Larghezze colonne per l'ordine richiesto (Totale 27.7 cm)
+    # Larghezze colonne ottimizzate per evitare il testo a capo spezzato (Totale: 27.7 cm)
     col_widths = [
-        2.5 * cm,  # Codice DMR
-        3.2 * cm,  # Fabbricante
-        7.5 * cm,  # Descrizione DMR
-        2.5 * cm,  # Cod. Equivalente
+        2.4 * cm,  # Codice DMR
+        3.0 * cm,  # Fabbricante
+        7.2 * cm,  # Descrizione DMR
+        2.3 * cm,  # Cod. Equivalente
         3.5 * cm,  # Descrizione Stato
-        2.0 * cm,  # Assenza CE
-        2.0 * cm,  # Manomesso
+        2.2 * cm,  # Assenza CE
+        2.6 * cm,  # Manomesso
         4.5 * cm,  # Note
     ]
 
