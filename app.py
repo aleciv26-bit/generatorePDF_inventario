@@ -9,7 +9,6 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 from reportlab.platypus import (
-    KeepTogether,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -120,7 +119,7 @@ def genera_singolo_pdf_bytes(
         fontSize=12,
         leading=15,
         textColor=colors.HexColor("#1A202C"),
-        keepWithNext=True,
+        keepWithNext=True,  # Evita titoli isolati a fondo pagina
     )
 
     header_set = ParagraphStyle(
@@ -130,7 +129,7 @@ def genera_singolo_pdf_bytes(
         fontSize=10,
         leading=13,
         textColor=colors.HexColor("#2B6CB0"),
-        keepWithNext=True,
+        keepWithNext=True,  # Legato alla tabella sottostante
     )
 
     cell_style = ParagraphStyle(
@@ -314,16 +313,14 @@ def genera_singolo_pdf_bytes(
         for (cod_set, nome_set, sbs), group_set in group_cdc.groupby(
             ["_CodSet", "_NomeSet", "_SBS"]
         ):
-            set_elements = []
-
             if first_set_of_cdc:
-                set_elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
-                set_elements.append(Spacer(1, 8))
+                elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
+                elements.append(Spacer(1, 8))
                 first_set_of_cdc = False
 
             hdr_text = f"{cod_set} - {nome_set} - SBS: {sbs} - Q.tà DMR: {len(group_set)}"
-            set_elements.append(Paragraph(hdr_text, header_set))
-            set_elements.append(Spacer(1, 4))
+            elements.append(Paragraph(hdr_text, header_set))
+            elements.append(Spacer(1, 4))
 
             table_data = [
                 [
@@ -365,10 +362,8 @@ def genera_singolo_pdf_bytes(
                 )
             )
 
-            set_elements.append(t_dmr)
-            set_elements.append(Spacer(1, 10))
-
-            elements.append(KeepTogether(set_elements))
+            elements.append(t_dmr)
+            elements.append(Spacer(1, 10))
 
     def canvas_maker(*args, **kwargs):
         return NumberedCanvas(*args, logo_path=logo_path, **kwargs)
