@@ -239,16 +239,14 @@ def genera_singolo_pdf_bytes(
         is_first_sbs = True
 
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
-            sbs_elements = []
-
             if is_first_sbs:
-                sbs_elements.append(
+                elements.append(
                     Paragraph(
                         f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
                         header_cdc,
                     )
                 )
-                sbs_elements.append(Spacer(1, 6))
+                elements.append(Spacer(1, 6))
                 is_first_sbs = False
 
             set_summary = (
@@ -271,7 +269,7 @@ def genera_singolo_pdf_bytes(
                     ]
                 )
 
-            t_sbs = Table(data_sbs, colWidths=[23.7 * cm, 4.0 * cm])
+            t_sbs = Table(data_sbs, colWidths=[23.7 * cm, 4.0 * cm], repeatRows=1)
             t_sbs.setStyle(
                 TableStyle(
                     [
@@ -283,12 +281,10 @@ def genera_singolo_pdf_bytes(
                     ]
                 )
             )
-            sbs_elements.append(t_sbs)
-            sbs_elements.append(Spacer(1, 6))
+            elements.append(t_sbs)
+            elements.append(Spacer(1, 8))
 
-            elements.append(KeepTogether(sbs_elements))
-
-        elements.append(Spacer(1, 12))
+        elements.append(Spacer(1, 6))
 
     elements.append(PageBreak())
 
@@ -373,8 +369,6 @@ def genera_singolo_pdf_bytes(
             set_elements.append(Spacer(1, 10))
 
             elements.append(KeepTogether(set_elements))
-
-        elements.append(Spacer(1, 10))
 
     def canvas_maker(*args, **kwargs):
         return NumberedCanvas(*args, logo_path=logo_path, **kwargs)
