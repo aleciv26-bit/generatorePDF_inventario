@@ -21,9 +21,10 @@ from reportlab.platypus import (
 
 class NumberedCanvas(canvas.Canvas):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, logo_path="logo he.png", **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
+        self.logo_path = logo_path
 
     def showPage(self):
         self._saved_page_states.append(dict(self.__dict__))
@@ -41,10 +42,9 @@ class NumberedCanvas(canvas.Canvas):
         self.saveState()
 
         # Logo posizionato in alto a destra nel margine superiore
-        logo_path = "logo he.png"
-        if os.path.exists(logo_path):
+        if os.path.exists(self.logo_path):
             self.drawImage(
-                logo_path,
+                self.logo_path,
                 24.2 * cm,
                 18.8 * cm,
                 width=4.5 * cm,
@@ -67,7 +67,7 @@ def pulisci(val):
 
 
 def genera_singolo_pdf_bytes(
-    df_ospedale, nome_ospedale, num_allegato
+    df_ospedale, nome_ospedale, num_allegato, sottotitolo_libero, logo_path
 ) -> bytes:
     """Genera il report PDF per un singolo Presidio Ospedaliero restituendo i byte in memoria."""
     buffer = io.BytesIO()
@@ -82,6 +82,40 @@ def genera_singolo_pdf_bytes(
     )
 
     styles = getSampleStyleSheet()
+
+    # Stile per il titolo della prima pagina extra (copertina)
+    cover_title_style = ParagraphStyle(
+        "CoverTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        alignment=1,  # Centrato
+        textColor=colors.HexColor("#1A365D"),
+    )
+
+    # Stile per il sottotitolo della prima pagina extra
+    cover_subtitle_style = ParagraphStyle(
+        "CoverSubtitle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=12,
+        leading=16,
+        alignment=1,  # Centrato
+        textColor=colors.HexColor("#4A5568"),
+    )
+
+    # Stile per il nuovo titolo riepilogo nella seconda pagina (più grande e centrato)
+    title_summary_style = ParagraphStyle(
+        "TitleSummary",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=15,
+        leading=18,
+        alignment=1,  # Centrato
+        textColor=colors.HexColor("#1A365D"),
+    )
+
     title_style = ParagraphStyle(
         "DocTitle",
         parent=styles["Normal"],
@@ -90,6 +124,7 @@ def genera_singolo_pdf_bytes(
         leading=14,
         textColor=colors.HexColor("#1A365D"),
     )
+
     subtitle_style = ParagraphStyle(
         "DocSubTitle",
         parent=styles["Normal"],
@@ -98,12 +133,14 @@ def genera_singolo_pdf_bytes(
         leading=12,
         textColor=colors.HexColor("#4A5568"),
     )
+
+    # Titoletto CDC/Reparto reso più grande (fontSize 12)
     header_cdc = ParagraphStyle(
         "HeaderCDC",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=9.5,
-        leading=12.5,
+        fontSize=12,
+        leading=15,
         textColor=colors.HexColor("#1A202C"),
     )
 
@@ -136,13 +173,27 @@ def genera_singolo_pdf_bytes(
 
     elements = []
 
-    # --- SEZIONE 1: RIEPILOGO SINTETICO ---
-    elements.append(Paragraph("REPORT INVENTARIO", title_style))
+    # --- PRIMA PAGINA EXTRA (COPERTINA) ---
+    elements.append(Spacer(1, 4 * cm))
     elements.append(
-        Paragraph("Riepilogo dei Set inventariati suddivisi per SBS", subtitle_style)
+        Paragraph(
+            "REPORT PERIZIA DOTAZIONE DISPOSITIVI MEDICI RIUTILIZZABILI",
+            cover_title_style,
+        )
     )
-    elements.append(Paragraph(f"All. {num_allegato} - {nome_ospedale}", subtitle_style))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 15))
+    if sottotitolo_libero:
+        elements.append(Paragraph(sottotitolo_libero, cover_subtitle_style))
+    elements.append(PageBreak())
+
+    # --- SEZIONE 1: RIEPILOGO SINTETICO (DIVENTATA LA SECONDA PAGINA) ---
+    elements.append(
+        Paragraph(
+            "RIEPILOGO DEI SET INVENTARIATI SUDDIVISI PER CENTRO DI COSTO (CDC) E PER SISTEMA BARRIERA STERILE (SBS)",
+            title_summary_style,
+        )
+    )
+    elements.append(Spacer(1, 15))
 
     tot_dmr = len(df_ospedale)
     tot_set = df_ospedale["_CodSet"].nunique()
@@ -175,13 +226,14 @@ def genera_singolo_pdf_bytes(
     elements.append(Spacer(1, 15))
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
+        # Nuovo titoletto CDC ingrandito
         elements.append(
             Paragraph(
-                f"<b>Reparto / CDC:</b> {cdc} | <b>TOT DMR:</b> {len(group_cdc)}",
+                f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
                 header_cdc,
             )
         )
-        elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 6))
 
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
             set_summary = (
@@ -219,12 +271,15 @@ def genera_singolo_pdf_bytes(
             elements.append(t_sbs)
             elements.append(Spacer(1, 6))
 
-        elements.append(Spacer(1, 8))
+        # Spazio triplo prima del titoletto del CDC successivo (portato a 24pt rispetto agli 8pt originali)
+        elements.append(Spacer(1, 24))
 
     elements.append(PageBreak())
 
     # --- SEZIONE 2: DETTAGLIO ANALITICO ---
-    elements.append(Paragraph("REPORT INVENTARIO", title_style))
+    elements.append(
+        Paragraph("REPORT PERIZIA DOTAZIONE DISPOSITIVI MEDICI RIUTILIZZABILI", title_style)
+    )
     elements.append(
         Paragraph(
             "Riepilogo valutazione dei DMR suddivisi per CDC e per Kit / Set",
@@ -233,13 +288,12 @@ def genera_singolo_pdf_bytes(
     )
     elements.append(
         Paragraph(
-            f"All. {num_allegato} - Schede Analitiche - {nome_ospedale}",
+            f"Schede Analitiche - {nome_ospedale}",
             subtitle_style,
         )
     )
     elements.append(Spacer(1, 10))
 
-    # Larghezze colonne ottimizzate per evitare il testo a capo spezzato (Totale: 27.7 cm)
     col_widths = [
         2.4 * cm,  # Codice DMR
         3.0 * cm,  # Fabbricante
@@ -261,7 +315,6 @@ def genera_singolo_pdf_bytes(
             set_elements.append(Paragraph(hdr_text, header_cdc))
             set_elements.append(Spacer(1, 4))
 
-            # Intestazioni nell'ordine specificato
             table_data = [
                 [
                     Paragraph("Codice DMR", cell_hdr),
@@ -275,7 +328,6 @@ def genera_singolo_pdf_bytes(
                 ]
             ]
 
-            # Dati nelle celle rispettando l'ordine
             for _, row in group_set.iterrows():
                 table_data.append(
                     [
@@ -308,7 +360,11 @@ def genera_singolo_pdf_bytes(
 
             elements.append(KeepTogether(set_elements))
 
-    doc.build(elements, canvasmaker=NumberedCanvas)
+    # Definizione factory per il canvas con logo dinamico
+    def canvas_maker(*args, **kwargs):
+        return NumberedCanvas(*args, logo_path=logo_path, **kwargs)
+
+    doc.build(elements, canvasmaker=canvas_maker)
     return buffer.getvalue()
 
 
@@ -317,7 +373,21 @@ st.set_page_config(page_title="Generatore Report PDF", layout="centered")
 
 st.title("📄 Generatore Report PDF Inventario")
 st.write(
-    "Carica il file Excel (`.xlsx`) per generare automaticamente i PDF di riepilogo suddivisi per Presidio Ospedaliero."
+    "Carica il file Excel (`.xlsx`) e imposta le opzioni per generare automaticamente i PDF di riepilogo."
+)
+
+# Selezione del logo
+scelta_logo = st.selectbox(
+    "Seleziona il logo da inserire nel PDF:",
+    options=["HE", "SIS"],
+    index=0
+)
+logo_path = "logo he.png" if scelta_logo == "HE" else "logo sis.png"
+
+# Campo testo libero per il sottotitolo della copertina
+sottotitolo_libero = st.text_input(
+    "Inserisci il sottotitolo per la prima pagina extra:",
+    placeholder="Es. Perizia tecnica relativa al Presidio Ospedaliero X..."
 )
 
 uploaded_file = st.file_uploader("Carica il file Excel", type=["xlsx", "xls"])
@@ -374,7 +444,11 @@ if uploaded_file is not None:
                 for idx, ospedale in enumerate(ospedali, start=1):
                     df_ospedale = df[df["_Ospedale"] == ospedale]
                     pdf_bytes = genera_singolo_pdf_bytes(
-                        df_ospedale, ospedale, idx
+                        df_ospedale,
+                        ospedale,
+                        idx,
+                        sottotitolo_libero,
+                        logo_path,
                     )
 
                     nome_file_sanificato = ospedale.replace(" ", "_").replace(
