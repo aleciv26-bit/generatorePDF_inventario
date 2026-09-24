@@ -113,6 +113,7 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A365D"),
     )
 
+    # IMPOSTIAMO keepWithNext=True PER EVITARE TITOLI ORFANI IN FONDO ALLA PAGINA
     header_cdc = ParagraphStyle(
         "HeaderCDC",
         parent=styles["Normal"],
@@ -120,6 +121,7 @@ def genera_singolo_pdf_bytes(
         fontSize=12,
         leading=15,
         textColor=colors.HexColor("#1A202C"),
+        keepWithNext=True,
     )
 
     header_set = ParagraphStyle(
@@ -129,6 +131,7 @@ def genera_singolo_pdf_bytes(
         fontSize=10,
         leading=13,
         textColor=colors.HexColor("#2B6CB0"),
+        keepWithNext=True,
     )
 
     cell_style = ParagraphStyle(
@@ -212,16 +215,22 @@ def genera_singolo_pdf_bytes(
     elements.append(Spacer(1, 15))
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        elements.append(
-            Paragraph(
-                f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
-                header_cdc,
-            )
-        )
-        elements.append(Spacer(1, 6))
-
+        is_first_sbs = True
+        
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
             sbs_elements = []
+            
+            # Se è il primo SBS del CDC, colleghiamo l'intestazione CDC al primo SBS
+            if is_first_sbs:
+                sbs_elements.append(
+                    Paragraph(
+                        f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
+                        header_cdc,
+                    )
+                )
+                sbs_elements.append(Spacer(1, 6))
+                is_first_sbs = False
+
             set_summary = (
                 group_sbs.groupby(["_CodSet", "_NomeSet"])
                 .size()
@@ -256,6 +265,8 @@ def genera_singolo_pdf_bytes(
             )
             sbs_elements.append(t_sbs)
             sbs_elements.append(Spacer(1, 6))
+            
+            # Il primo blocco garantisce che l'intestazione CDC e la prima tabella SBS vadano insieme a pagina nuova se non c'è spazio sufficiente
             elements.append(KeepTogether(sbs_elements))
 
         elements.append(Spacer(1, 12))
@@ -392,7 +403,7 @@ if uploaded_file is not None:
             )
             df["_CodSet"] = df["m_sets.code"].apply(pulisci)
             df["_NomeSet"] = df["m_sets.name"].apply(pulisci)
-            
+
             raw_fab = (
                 df["manufacturers.name"].apply(pulisci)
                 if "manufacturers.name" in df
@@ -401,8 +412,7 @@ if uploaded_file is not None:
             raw_cod_dmr = (
                 df["articles.code"].apply(pulisci) if "articles.code" in df else ""
             )
-            
-            # Recupera la colonna M (indice 12 nel file Excel)
+
             col_m_vals = (
                 df.iloc[:, 12].apply(pulisci)
                 if df.shape[1] > 12
@@ -419,10 +429,14 @@ if uploaded_file is not None:
             )
 
             raw_ce = df["MarcaturaCE"].apply(pulisci) if "MarcaturaCE" in df else ""
-            df["_CE"] = raw_ce.apply(lambda x: "SI" if x.upper() in ["NO CE", "SI", "1"] else "")
+            df["_CE"] = raw_ce.apply(
+                lambda x: "SI" if x.upper() in ["NO CE", "SI", "1"] else ""
+            )
 
             raw_man = df["Manomissione"].apply(pulisci) if "Manomissione" in df else ""
-            df["_Man"] = raw_man.apply(lambda x: "SI" if x.lower() in ["manomesso", "si", "1"] else "")
+            df["_Man"] = raw_man.apply(
+                lambda x: "SI" if x.lower() in ["manomesso", "si", "1"] else ""
+            )
 
             df["_Note"] = df["note"].apply(pulisci) if "note" in df else ""
 
@@ -431,18 +445,15 @@ if uploaded_file is not None:
             eq_list = []
 
             for c_dmr, f_val, col_m in zip(raw_cod_dmr, raw_fab, col_m_vals):
-                # Se il codice originale è NNNN, non deve mai comparire nulla in Cod. Equivalente
                 if c_dmr.upper() == "NNNN":
                     cod_dmr_list.append("Non presente")
                     fab_list.append("Non presente")
                     eq_list.append("")
-                # Se la colonna M è compilata (non vuota) e il codice NON è NNNN
                 elif col_m != "":
                     cod_dmr_list.append("Non presente")
                     fab_list.append("Non presente")
                     eq_val = " + ".join([v for v in [c_dmr, f_val] if v])
                     eq_list.append(eq_val)
-                # Tutti gli altri casi regolari
                 else:
                     cod_dmr_list.append(c_dmr)
                     fab_list.append(f_val)
