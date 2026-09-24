@@ -113,7 +113,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A365D"),
     )
 
-    # IMPOSTIAMO keepWithNext=True PER EVITARE TITOLI ORFANI IN FONDO ALLA PAGINA
     header_cdc = ParagraphStyle(
         "HeaderCDC",
         parent=styles["Normal"],
@@ -157,6 +156,28 @@ def genera_singolo_pdf_bytes(
         fontSize=7,
         leading=9,
         textColor=colors.white,
+        splitByChar=0,
+    )
+
+    # Stili per la Sezione 2 con centratura orizzontale
+    cell_center = ParagraphStyle(
+        "CellCenter",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7,
+        leading=9,
+        alignment=1,  # Centrato orizzontalmente
+        splitByChar=0,
+    )
+
+    cell_hdr_center = ParagraphStyle(
+        "CellHdrCenter",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=colors.white,
+        alignment=1,  # Centrato orizzontalmente
         splitByChar=0,
     )
 
@@ -216,11 +237,10 @@ def genera_singolo_pdf_bytes(
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
         is_first_sbs = True
-        
+
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
             sbs_elements = []
-            
-            # Se è il primo SBS del CDC, colleghiamo l'intestazione CDC al primo SBS
+
             if is_first_sbs:
                 sbs_elements.append(
                     Paragraph(
@@ -265,8 +285,7 @@ def genera_singolo_pdf_bytes(
             )
             sbs_elements.append(t_sbs)
             sbs_elements.append(Spacer(1, 6))
-            
-            # Il primo blocco garantisce che l'intestazione CDC e la prima tabella SBS vadano insieme a pagina nuova se non c'è spazio sufficiente
+
             elements.append(KeepTogether(sbs_elements))
 
         elements.append(Spacer(1, 12))
@@ -312,28 +331,28 @@ def genera_singolo_pdf_bytes(
 
             table_data = [
                 [
-                    Paragraph("Codice DMR", cell_hdr),
-                    Paragraph("Fabbricante", cell_hdr),
-                    Paragraph("Descrizione DMR", cell_hdr),
-                    Paragraph("Cod. Equivalente", cell_hdr),
-                    Paragraph("Descrizione stato", cell_hdr),
-                    Paragraph("Assenza CE", cell_hdr),
-                    Paragraph("Manomesso", cell_hdr),
-                    Paragraph("Note", cell_hdr),
+                    Paragraph("Codice DMR", cell_hdr_center),
+                    Paragraph("Fabbricante", cell_hdr_center),
+                    Paragraph("Descrizione DMR", cell_hdr_center),
+                    Paragraph("Cod. Equivalente", cell_hdr_center),
+                    Paragraph("Descrizione stato", cell_hdr_center),
+                    Paragraph("Assenza CE", cell_hdr_center),
+                    Paragraph("Manomesso", cell_hdr_center),
+                    Paragraph("Note", cell_hdr_center),
                 ]
             ]
 
             for _, row in group_set.iterrows():
                 table_data.append(
                     [
-                        Paragraph(row["_CodDMR"], cell_style),
-                        Paragraph(row["_Fab"], cell_style),
-                        Paragraph(row["_DescDMR"], cell_style),
-                        Paragraph(row["_Eq"], cell_style),
-                        Paragraph(row["_Stato"], cell_style),
-                        Paragraph(row["_CE"], cell_style),
-                        Paragraph(row["_Man"], cell_style),
-                        Paragraph(row["_Note"], cell_style),
+                        Paragraph(row["_CodDMR"], cell_center),
+                        Paragraph(row["_Fab"], cell_center),
+                        Paragraph(row["_DescDMR"], cell_style),  # Allineato a sinistra, centrato solo in altezza
+                        Paragraph(row["_Eq"], cell_center),
+                        Paragraph(row["_Stato"], cell_center),
+                        Paragraph(row["_CE"], cell_center),
+                        Paragraph(row["_Man"], cell_center),
+                        Paragraph(row["_Note"], cell_center),
                     ]
                 )
 
@@ -343,7 +362,7 @@ def genera_singolo_pdf_bytes(
                     [
                         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2D3748")),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E0")),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),  # Centrato in altezza per tutte le caselle
                         ("TOPPADDING", (0, 0), (-1, -1), 3),
                         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                     ]
