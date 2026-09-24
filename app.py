@@ -83,7 +83,6 @@ def genera_singolo_pdf_bytes(
 
     styles = getSampleStyleSheet()
 
-    # Stile per il titolo della prima pagina extra (copertina)
     cover_title_style = ParagraphStyle(
         "CoverTitle",
         parent=styles["Normal"],
@@ -94,7 +93,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A365D"),
     )
 
-    # Stile per il sottotitolo della prima pagina extra
     cover_subtitle_style = ParagraphStyle(
         "CoverSubtitle",
         parent=styles["Normal"],
@@ -105,7 +103,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#4A5568"),
     )
 
-    # Stile per i titoli centrati grandi (Riepilogo e Sezione 2)
     title_summary_style = ParagraphStyle(
         "TitleSummary",
         parent=styles["Normal"],
@@ -116,7 +113,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A365D"),
     )
 
-    # Titoletto CDC/Reparto (fontSize 12)
     header_cdc = ParagraphStyle(
         "HeaderCDC",
         parent=styles["Normal"],
@@ -126,7 +122,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A202C"),
     )
 
-    # Titoletto Kit/Set Sezione 2 (fontSize 10)
     header_set = ParagraphStyle(
         "HeaderSet",
         parent=styles["Normal"],
@@ -136,7 +131,6 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#2B6CB0"),
     )
 
-    # Stili celle senza andata a capo a metà parola (splitByChar=0)
     cell_style = ParagraphStyle(
         "Cell",
         parent=styles["Normal"],
@@ -218,13 +212,14 @@ def genera_singolo_pdf_bytes(
     elements.append(Spacer(1, 15))
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        elements.append(
+        cdc_elements = []
+        cdc_elements.append(
             Paragraph(
                 f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
                 header_cdc,
             )
         )
-        elements.append(Spacer(1, 6))
+        cdc_elements.append(Spacer(1, 6))
 
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
             set_summary = (
@@ -259,15 +254,15 @@ def genera_singolo_pdf_bytes(
                     ]
                 )
             )
-            elements.append(t_sbs)
-            elements.append(Spacer(1, 6))
+            cdc_elements.append(t_sbs)
+            cdc_elements.append(Spacer(1, 6))
 
-        elements.append(Spacer(1, 24))
+        cdc_elements.append(Spacer(1, 18))
+        elements.append(KeepTogether(cdc_elements))
 
     elements.append(PageBreak())
 
     # --- SEZIONE 2: DETTAGLIO ANALITICO ---
-    # Nuovo titolo centrato e ingrandito
     elements.append(
         Paragraph(
             "RIEPILOGO VALUTAZIONE DMR SUDDIVISI PER CENTRO DI COSTO E PER SET",
@@ -288,16 +283,20 @@ def genera_singolo_pdf_bytes(
     ]
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        # Intestazione CDC stampata UNA SOLA VOLTA per ciascun Centro di Costo
-        elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
-        elements.append(Spacer(1, 8))
+        first_set_of_cdc = True  # Flag per agganciare l'intestazione del CDC al primo Set
 
         for (cod_set, nome_set, sbs), group_set in group_cdc.groupby(
             ["_CodSet", "_NomeSet", "_SBS"]
         ):
             set_elements = []
 
-            # Nuovo formato per l'intestazione della tabella Set
+            # Se è il primo Set del CDC, aggiungiamo il titolo del CDC dentro lo stesso blocco KeepTogether
+            if first_set_of_cdc:
+                set_elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
+                set_elements.append(Spacer(1, 8))
+                first_set_of_cdc = False
+
+            # Intestazione della tabella Set
             hdr_text = f"{cod_set} - {nome_set} - SBS: {sbs} - Q.tà DMR: {len(group_set)}"
             set_elements.append(Paragraph(hdr_text, header_set))
             set_elements.append(Spacer(1, 4))
@@ -345,12 +344,11 @@ def genera_singolo_pdf_bytes(
             set_elements.append(t_dmr)
             set_elements.append(Spacer(1, 10))
 
+            # Impacchetta il titolo (eventuale del CDC + del Set) insieme alla tabella
             elements.append(KeepTogether(set_elements))
 
-        # Spazio extra dopo aver completato tutte le tabelle di un CDC
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 10))
 
-    # Definizione factory per il canvas con logo dinamico
     def canvas_maker(*args, **kwargs):
         return NumberedCanvas(*args, logo_path=logo_path, **kwargs)
 
@@ -366,7 +364,6 @@ st.write(
     "Carica il file Excel (`.xlsx`) e imposta le opzioni per generare automaticamente i PDF di riepilogo."
 )
 
-# Selezione del logo
 scelta_logo = st.selectbox(
     "Seleziona il logo da inserire nel PDF:",
     options=["HE", "SIS"],
@@ -374,7 +371,6 @@ scelta_logo = st.selectbox(
 )
 logo_path = "logo he.png" if scelta_logo == "HE" else "logo sis.png"
 
-# Campo testo libero per il sottotitolo della copertina
 sottotitolo_libero = st.text_input(
     "Inserisci il sottotitolo per la prima pagina extra:",
     placeholder="Es. Perizia tecnica relativa al Presidio Ospedaliero X..."
@@ -409,11 +405,11 @@ if uploaded_file is not None:
                 df["articles.code"].apply(pulisci) if "articles.code" in df else ""
             )
             
-            # Controllo colonna M (indice 12 nel file excel se presente, oppure tramite nome)
+            # Recupera la colonna M (indice 12 nel file Excel)
             col_m_vals = (
                 df.iloc[:, 12].apply(pulisci)
                 if df.shape[1] > 12
-                else df["DescrizioneStato"].apply(pulisci) if "DescrizioneStato" in df else pd.Series([""] * len(df))
+                else pd.Series([""] * len(df))
             )
 
             df["_DescDMR"] = (
@@ -425,7 +421,6 @@ if uploaded_file is not None:
                 else "OK"
             )
 
-            # Gestione Trasformazioni "Assenza CE" e "Manomesso"
             raw_ce = df["MarcaturaCE"].apply(pulisci) if "MarcaturaCE" in df else ""
             df["_CE"] = raw_ce.apply(lambda x: "SI" if x.upper() in ["NO CE", "SI", "1"] else "")
 
@@ -434,27 +429,26 @@ if uploaded_file is not None:
 
             df["_Note"] = df["note"].apply(pulisci) if "note" in df else ""
 
-            # Applicazione logica per Codice DMR, Fabbricante e Cod. Equivalente
             cod_dmr_list = []
             fab_list = []
             eq_list = []
 
             for c_dmr, f_val, col_m in zip(raw_cod_dmr, raw_fab, col_m_vals):
-                # 1. Se colonna M è "non definito"
-                if col_m.lower() == "non definito":
-                    eq_list.append(f"{c_dmr} + {f_val}".strip(" +"))
-                    cod_dmr_list.append("non definito")
-                    fab_list.append("non definito")
-                # 2. Se Codice DMR è "NNNN"
-                elif c_dmr.upper() == "NNNN":
-                    eq_list.append("")
+                # Se la colonna M è compilata (non vuota)
+                if col_m != "":
                     cod_dmr_list.append("Non presente")
                     fab_list.append("Non presente")
-                # 3. Caso standard
-                else:
+                    # Unisce Codice DMR e Fabbricante separati da " + "
+                    eq_val = " + ".join([v for v in [c_dmr, f_val] if v])
+                    eq_list.append(eq_val)
+                elif c_dmr.upper() == "NNNN":
+                    cod_dmr_list.append("Non presente")
+                    fab_list.append("Non presente")
                     eq_list.append("")
+                else:
                     cod_dmr_list.append(c_dmr)
                     fab_list.append(f_val)
+                    eq_list.append("")
 
             df["_CodDMR"] = cod_dmr_list
             df["_Fab"] = fab_list
@@ -462,7 +456,6 @@ if uploaded_file is not None:
 
             ospedali = [o for o in df["_Ospedale"].unique() if o]
 
-            # Creo uno ZIP in memoria per contenere tutti i PDF generati
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(
                 zip_buffer, "w", zipfile.ZIP_DEFLATED
