@@ -212,16 +212,16 @@ def genera_singolo_pdf_bytes(
     elements.append(Spacer(1, 15))
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        cdc_elements = []
-        cdc_elements.append(
+        elements.append(
             Paragraph(
                 f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
                 header_cdc,
             )
         )
-        cdc_elements.append(Spacer(1, 6))
+        elements.append(Spacer(1, 6))
 
         for sbs, group_sbs in group_cdc.groupby("_SBS"):
+            sbs_elements = []
             set_summary = (
                 group_sbs.groupby(["_CodSet", "_NomeSet"])
                 .size()
@@ -254,11 +254,11 @@ def genera_singolo_pdf_bytes(
                     ]
                 )
             )
-            cdc_elements.append(t_sbs)
-            cdc_elements.append(Spacer(1, 6))
+            sbs_elements.append(t_sbs)
+            sbs_elements.append(Spacer(1, 6))
+            elements.append(KeepTogether(sbs_elements))
 
-        cdc_elements.append(Spacer(1, 18))
-        elements.append(KeepTogether(cdc_elements))
+        elements.append(Spacer(1, 12))
 
     elements.append(PageBreak())
 
@@ -283,20 +283,18 @@ def genera_singolo_pdf_bytes(
     ]
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        first_set_of_cdc = True  # Flag per agganciare l'intestazione del CDC al primo Set
+        first_set_of_cdc = True
 
         for (cod_set, nome_set, sbs), group_set in group_cdc.groupby(
             ["_CodSet", "_NomeSet", "_SBS"]
         ):
             set_elements = []
 
-            # Se è il primo Set del CDC, aggiungiamo il titolo del CDC dentro lo stesso blocco KeepTogether
             if first_set_of_cdc:
                 set_elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
                 set_elements.append(Spacer(1, 8))
                 first_set_of_cdc = False
 
-            # Intestazione della tabella Set
             hdr_text = f"{cod_set} - {nome_set} - SBS: {sbs} - Q.tà DMR: {len(group_set)}"
             set_elements.append(Paragraph(hdr_text, header_set))
             set_elements.append(Spacer(1, 4))
@@ -344,7 +342,6 @@ def genera_singolo_pdf_bytes(
             set_elements.append(t_dmr)
             set_elements.append(Spacer(1, 10))
 
-            # Impacchetta il titolo (eventuale del CDC + del Set) insieme alla tabella
             elements.append(KeepTogether(set_elements))
 
         elements.append(Spacer(1, 10))
@@ -434,17 +431,18 @@ if uploaded_file is not None:
             eq_list = []
 
             for c_dmr, f_val, col_m in zip(raw_cod_dmr, raw_fab, col_m_vals):
-                # Se la colonna M è compilata (non vuota)
-                if col_m != "":
-                    cod_dmr_list.append("Non presente")
-                    fab_list.append("Non presente")
-                    # Unisce Codice DMR e Fabbricante separati da " + "
-                    eq_val = " + ".join([v for v in [c_dmr, f_val] if v])
-                    eq_list.append(eq_val)
-                elif c_dmr.upper() == "NNNN":
+                # Se il codice originale è NNNN, non deve mai comparire nulla in Cod. Equivalente
+                if c_dmr.upper() == "NNNN":
                     cod_dmr_list.append("Non presente")
                     fab_list.append("Non presente")
                     eq_list.append("")
+                # Se la colonna M è compilata (non vuota) e il codice NON è NNNN
+                elif col_m != "":
+                    cod_dmr_list.append("Non presente")
+                    fab_list.append("Non presente")
+                    eq_val = " + ".join([v for v in [c_dmr, f_val] if v])
+                    eq_list.append(eq_val)
+                # Tutti gli altri casi regolari
                 else:
                     cod_dmr_list.append(c_dmr)
                     fab_list.append(f_val)
