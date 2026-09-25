@@ -197,7 +197,7 @@ def genera_singolo_pdf_bytes(
     elements.append(Spacer(1, 4 * cm))
     elements.append(
         Paragraph(
-            "REPORT PERIZIA DOTAZIONE DISPOSITIVI MEDICI RIUTILIZZABILI",
+            "PERIZIA TECNICA DOTAZIONE DISPOSITIVI MEDICI RIUTILIZZABILI",
             cover_title_style,
         )
     )
