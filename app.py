@@ -321,7 +321,6 @@ def genera_singolo_pdf_bytes(
     is_first_cdc_sezione_2 = True
 
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        # Se non è il primissimo CDC della Sezione 2, forza un salto pagina
         if not is_first_cdc_sezione_2:
             elements.append(PageBreak())
         else:
@@ -405,7 +404,6 @@ uploaded_file = st.file_uploader("Carica il file Excel", type=["xlsx", "xls"])
 if uploaded_file is not None:
     df_raw = pd.read_excel(uploaded_file)
 
-    # Identificazione Presidi Ospedalieri
     if "Presidio Ospedaliero" in df_raw:
         ospedali_trovati = [
             o for o in df_raw["Presidio Ospedaliero"].apply(pulisci).unique() if o
@@ -418,7 +416,6 @@ if uploaded_file is not None:
         f"Rilevati **{len(ospedali_trovati)}** Presidi Ospedalieri nel file Excel. Inserisci il sottotitolo personalizzato per ciascun PDF:"
     )
 
-    # Dizionario per memorizzare i sottotitoli separati per ogni PDF/Ospedale
     sottotitoli_ospedali = {}
 
     for idx, osp in enumerate(ospedali_trovati, start=1):
@@ -495,7 +492,8 @@ if uploaded_file is not None:
                 elif col_m != "":
                     cod_dmr_list.append("Non presente")
                     fab_list.append("Non presente")
-                    eq_val = " + ".join([v for v in [c_dmr, f_val] if v])
+                    # MODIFICA QUI: Fabbricante prima, poi Codice DMR con separatore " - "
+                    eq_val = " - ".join([v for v in [f_val, c_dmr] if v])
                     eq_list.append(eq_val)
                 else:
                     cod_dmr_list.append(c_dmr)
