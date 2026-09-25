@@ -112,14 +112,26 @@ def genera_singolo_pdf_bytes(
         textColor=colors.HexColor("#1A365D"),
     )
 
-    header_cdc = ParagraphStyle(
-        "HeaderCDC",
+    # Titolo CDC per Sezione 1 (riepilogo)
+    header_cdc_s1 = ParagraphStyle(
+        "HeaderCDCS1",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
         fontSize=12,
         leading=15,
         textColor=colors.HexColor("#1A202C"),
-        keepWithNext=True,  # Evita titoli isolati a fondo pagina
+        keepWithNext=True,
+    )
+
+    # Titolo CDC per Sezione 2 (molto più grande, ~doppio)
+    header_cdc_s2 = ParagraphStyle(
+        "HeaderCDCS2",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor("#1A202C"),
+        keepWithNext=True,
     )
 
     header_set = ParagraphStyle(
@@ -129,7 +141,7 @@ def genera_singolo_pdf_bytes(
         fontSize=10,
         leading=13,
         textColor=colors.HexColor("#2B6CB0"),
-        keepWithNext=True,  # Legato alla tabella sottostante
+        keepWithNext=True,
     )
 
     cell_style = ParagraphStyle(
@@ -158,14 +170,13 @@ def genera_singolo_pdf_bytes(
         splitByChar=0,
     )
 
-    # Stili per la Sezione 2 con centratura orizzontale
     cell_center = ParagraphStyle(
         "CellCenter",
         parent=styles["Normal"],
         fontName="Helvetica",
         fontSize=7,
         leading=9,
-        alignment=1,  # Centrato orizzontalmente
+        alignment=1,
         splitByChar=0,
     )
 
@@ -176,7 +187,7 @@ def genera_singolo_pdf_bytes(
         fontSize=7,
         leading=9,
         textColor=colors.white,
-        alignment=1,  # Centrato orizzontalmente
+        alignment=1,
         splitByChar=0,
     )
 
@@ -242,7 +253,7 @@ def genera_singolo_pdf_bytes(
                 elements.append(
                     Paragraph(
                         f"CDC: {cdc} - totale DMR: {len(group_cdc)}",
-                        header_cdc,
+                        header_cdc_s1,
                     )
                 )
                 elements.append(Spacer(1, 6))
@@ -307,17 +318,21 @@ def genera_singolo_pdf_bytes(
         4.5 * cm,  # Note
     ]
 
+    is_first_cdc_sezione_2 = True
+
     for cdc, group_cdc in df_ospedale.groupby("_CDC"):
-        first_set_of_cdc = True
+        # Se non è il primissimo CDC della Sezione 2, forza un salto pagina
+        if not is_first_cdc_sezione_2:
+            elements.append(PageBreak())
+        else:
+            is_first_cdc_sezione_2 = False
+
+        elements.append(Paragraph(f"CDC: {cdc}", header_cdc_s2))
+        elements.append(Spacer(1, 10))
 
         for (cod_set, nome_set, sbs), group_set in group_cdc.groupby(
             ["_CodSet", "_NomeSet", "_SBS"]
         ):
-            if first_set_of_cdc:
-                elements.append(Paragraph(f"CDC: {cdc}", header_cdc))
-                elements.append(Spacer(1, 8))
-                first_set_of_cdc = False
-
             hdr_text = f"{cod_set} - {nome_set} - SBS: {sbs} - Q.tà DMR: {len(group_set)}"
             elements.append(Paragraph(hdr_text, header_set))
             elements.append(Spacer(1, 4))
@@ -340,7 +355,7 @@ def genera_singolo_pdf_bytes(
                     [
                         Paragraph(row["_CodDMR"], cell_center),
                         Paragraph(row["_Fab"], cell_center),
-                        Paragraph(row["_DescDMR"], cell_style),  # Allineato a sinistra, centrato solo in altezza
+                        Paragraph(row["_DescDMR"], cell_style),
                         Paragraph(row["_Eq"], cell_center),
                         Paragraph(row["_Stato"], cell_center),
                         Paragraph(row["_CE"], cell_center),
@@ -355,7 +370,7 @@ def genera_singolo_pdf_bytes(
                     [
                         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2D3748")),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E0")),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),  # Centrato in altezza per tutte le caselle
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                         ("TOPPADDING", (0, 0), (-1, -1), 3),
                         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                     ]
@@ -363,7 +378,7 @@ def genera_singolo_pdf_bytes(
             )
 
             elements.append(t_dmr)
-            elements.append(Spacer(1, 10))
+            elements.append(Spacer(1, 12))
 
     def canvas_maker(*args, **kwargs):
         return NumberedCanvas(*args, logo_path=logo_path, **kwargs)
@@ -377,27 +392,47 @@ st.set_page_config(page_title="Generatore Report PDF", layout="centered")
 
 st.title("📄 Generatore Report PDF Inventario")
 st.write(
-    "Carica il file Excel (`.xlsx`) e imposta le opzioni per generare automaticamente i PDF di riepilogo."
+    "Carica il file Excel (`.xlsx`) per inserire i sottotitoli di copertina dedicati e generare i PDF."
 )
 
 scelta_logo = st.selectbox(
-    "Seleziona il logo da inserire nel PDF:",
-    options=["HE", "SIS"],
-    index=0
+    "Seleziona il logo da inserire nel PDF:", options=["HE", "SIS"], index=0
 )
 logo_path = "logo he.png" if scelta_logo == "HE" else "logo sis.png"
-
-sottotitolo_libero = st.text_input(
-    "Inserisci il sottotitolo per la prima pagina extra:",
-    placeholder="Es. Perizia tecnica relativa al Presidio Ospedaliero X..."
-)
 
 uploaded_file = st.file_uploader("Carica il file Excel", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
+    df_raw = pd.read_excel(uploaded_file)
+
+    # Identificazione Presidi Ospedalieri
+    if "Presidio Ospedaliero" in df_raw:
+        ospedali_trovati = [
+            o for o in df_raw["Presidio Ospedaliero"].apply(pulisci).unique() if o
+        ]
+    else:
+        ospedali_trovati = ["Generale"]
+
+    st.subheader("📌 Personalizzazione Sottotitoli di Copertina")
+    st.info(
+        f"Rilevati **{len(ospedali_trovati)}** Presidi Ospedalieri nel file Excel. Inserisci il sottotitolo personalizzato per ciascun PDF:"
+    )
+
+    # Dizionario per memorizzare i sottotitoli separati per ogni PDF/Ospedale
+    sottotitoli_ospedali = {}
+
+    for idx, osp in enumerate(ospedali_trovati, start=1):
+        sottotitoli_ospedali[osp] = st.text_input(
+            f"Sottotitolo per PDF Allegato {idx} ({osp}):",
+            value=f"Perizia tecnica relativa al Presidio Ospedaliero {osp}",
+            key=f"sub_{idx}_{osp}",
+        )
+
+    st.write("---")
+
     if st.button("🚀 Genera Report PDF", type="primary"):
         with st.spinner("Elaborazione dati e generazione PDF in corso..."):
-            df = pd.read_excel(uploaded_file)
+            df = df_raw.copy()
 
             df["_Ospedale"] = (
                 df["Presidio Ospedaliero"].apply(pulisci)
@@ -471,19 +506,19 @@ if uploaded_file is not None:
             df["_Fab"] = fab_list
             df["_Eq"] = eq_list
 
-            ospedali = [o for o in df["_Ospedale"].unique() if o]
-
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(
                 zip_buffer, "w", zipfile.ZIP_DEFLATED
             ) as zip_file:
-                for idx, ospedale in enumerate(ospedali, start=1):
+                for idx, ospedale in enumerate(ospedali_trovati, start=1):
                     df_ospedale = df[df["_Ospedale"] == ospedale]
+                    sub_personalizzato = sottotitoli_ospedali.get(ospedale, "")
+
                     pdf_bytes = genera_singolo_pdf_bytes(
                         df_ospedale,
                         ospedale,
                         idx,
-                        sottotitolo_libero,
+                        sub_personalizzato,
                         logo_path,
                     )
 
