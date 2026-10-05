@@ -17,6 +17,41 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+# --- GESTIONE AUTENTICAZIONE LOGIN --- da qui
+#def check_password():
+   # """Restituisce True se l'utente è autenticato, altrimenti mostra la pagina di login."""
+    
+    # 1. Se l'utente è già autenticato, restituisce True
+    #if st.session_state.get("authenticated", False):
+       # return True
+
+    # 2. Mostra la schermata di login
+    #st.set_page_config(page_title="Accedi - Generatore Report PDF", layout="centered")
+    
+    #st.title("🔒 Accesso Riservato")
+    #st.write("Inserisci le credenziali per accedere all'applicazione.")
+
+   # with st.form("login_form"):
+     #   username_input = st.text_input("Username")
+      #  password_input = st.text_input("Password", type="password")
+      #  submit_button = st.form_submit_button("Accedi")
+
+     #   if submit_button:
+       #     if username_input == "Hospital_engineering" and password_input == "Hospital!x2026":
+        #        st.session_state["authenticated"] = True
+        #        st.rerun()  # Ricarica la pagina per mostrare l'app
+       #     else:
+       #         st.error("❌ Username o password errati.")
+
+ #   return False
+
+# Blocco principale: se non si è autenticati, si interrompe la gestione del resto dello script
+#if not check_password():
+ #   st.stop()
+
+# ==============================================================================
+# fino qui
+# ==============================================================================
 
 class NumberedCanvas(canvas.Canvas):
 
